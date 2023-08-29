@@ -53,9 +53,10 @@ TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
 // TODO: Define any input variables
-static uint8_t patterns[] = {};
-
-
+static uint8_t patterns[6] = {0b10101010, 0b01010101, 0b11001100, 0b00110011, 0b11110000, 0b00001111};
+uint16_t patternaddress = 0;
+uint16_t currentDelay = 1000;
+uint16_t nextDelay = 500;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,9 +107,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   // TODO: Start timer TIM16
-
+  HAL_TIM_Base_Start_IT(&htim16);
 
   // TODO: Write all "patterns" to EEPROM using SPI
+  uint16_t address = 0; //Initialize address to 0
+for (int i = 0; i < 6; i++){
+	write_to_address(address, patterns[i]); //Write pattern i to current address
+	address++; //increase the address for the next iteration
+}
+
 
 
   /* USER CODE END 2 */
@@ -122,7 +129,14 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	// TODO: Check button PA0; if pressed, change timer delay
+	  uint16_t tempHold;
+     if (HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_0)==0){
+    	 tempHold = currentDelay;
+    	 currentDelay = nextDelay;
+    	 nextDelay = tempHold; //this code section switches the delay variable value when the button is pressed
+     }
 
+     htim16.Instance->ARR=currentDelay; //Accesses the address of the timer and then sets the AutoReloadRegister to the currentDelay
   }
   /* USER CODE END 3 */
 }
@@ -428,7 +442,18 @@ void TIM16_IRQHandler(void)
 {
 	// Acknowledge interrupt
 	HAL_TIM_IRQHandler(&htim16);
-
+    if (patternaddress > 5){
+    	patternaddress = 0;
+    }
+    //checks whether the 8-bit value read from EEPROM corresponds to the correct value in your array
+    if (read_from_address(patternaddress) == patterns[patternaddress]){
+    	GPIOB->ODR = read_from_address(patternaddress);
+    	patternaddress++;
+    }
+    //fail safe of output 0b00000001 to indicate SPI failure
+    else{
+    	GPIOB->ODR = 1;
+    }
 	// TODO: Change to next LED pattern; output 0x01 if the read SPI data is incorrect
 
 }
